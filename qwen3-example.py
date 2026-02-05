@@ -54,7 +54,7 @@ def format_document_to_score_param(doc_dict: Dict[str, Any]) -> ScoreMultiModalP
 
 def main():
     parser = argparse.ArgumentParser(description="Offline Reranker with vLLM")
-    parser.add_argument("--model-path", type=str, default="models/Qwen3-VL-Reranker-8B", help="Path to the reranker model")
+    parser.add_argument("--model-path", type=str, default="Qwen/Qwen3-VL-Reranker-8B", help="Path to the reranker model")
     parser.add_argument("--dtype", type=str, default="bfloat16", help="Data type (e.g., bfloat16)")
     parser.add_argument("--template-path", type=str, default="vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja", 
                         help="Path to chat template file")
