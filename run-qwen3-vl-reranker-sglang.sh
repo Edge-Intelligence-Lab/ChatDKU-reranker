@@ -1,3 +1,5 @@
+# This script doesn't work as of Jan 2026, because SGLang had a bug.
+
 VISIBLE_CUDA_DEVICES=4 HF_HOME=/datapool/huggingface/ HF_ENDPOINT=https://hf-mirror.com ./.venv/bin/python3 -m sglang.launch_server \
   --host 0.0.0.0 \
   --port 30000 \

@@ -1,10 +1,9 @@
 import argparse
 import os
 from pathlib import Path
-from typing import Dict, Any
-from vllm import LLM, EngineArgs
-from vllm.entrypoints.score_utils import ScoreMultiModalParam
-
+from typing import Dict, Any, List
+import requests
+import json
 
 queries = [
     {"text": "A woman playing with her dog on a beach at sunset."}
@@ -18,7 +17,7 @@ documents = [
 ]
 
 
-def format_document_to_score_param(doc_dict: Dict[str, Any]) -> ScoreMultiModalParam:
+def format_document_to_score_param(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
     content = []
     
     text = doc_dict.get('text')
@@ -52,44 +51,63 @@ def format_document_to_score_param(doc_dict: Dict[str, Any]) -> ScoreMultiModalP
     return {"content": content}
 
 
+def call_vllm_rerank(
+    base_url: str,
+    model: str,
+    query: str,
+    docs_params: List[Dict[str, Any]],
+    api_key: str = None,
+) -> List[float]:
+    """
+    Call vLLM's /v1/rerank endpoint and return the scores in document order.
+    Assumes vLLM was started with --task score so that /v1/rerank is available.
+    """
+    documents_payload = [json.dumps(p) for p in docs_params]
+
+    payload = {
+        "model": model,
+        "query": query,
+        "documents": documents_payload,
+    }
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    url = f"{base_url.rstrip('/')}/v1/rerank"
+    resp = requests.post(url, headers=headers, json=payload)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Cohere/Jina-style response: data["results"] is a list of {index, relevance_score}
+    # Sorting by index
+    results = sorted(data["results"], key=lambda x: x["index"])
+    scores = [r["relevance_score"] for r in results]
+    return scores
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Offline Reranker with vLLM")
-    parser.add_argument("--model-path", type=str, default="Qwen/Qwen3-VL-Reranker-8B", help="Path to the reranker model")
-    parser.add_argument("--dtype", type=str, default="bfloat16", help="Data type (e.g., bfloat16)")
-    parser.add_argument("--template-path", type=str, default="vllm/examples/pooling/score/template/qwen3_vl_reranker.jinja", 
-                        help="Path to chat template file")
+    parser = argparse.ArgumentParser(description="Online Reranker with vLLM HTTP server")
+    parser.add_argument("--base-url", type=str, default="http://localhost:6767",
+                        help="Base URL of vLLM server (e.g., http://localhost:6767)")
+    parser.add_argument("--model", type=str, default="Qwen/Qwen3-VL-Reranker-8B",
+                        help="Model name as exposed by vLLM")
+    parser.add_argument("--api-key", type=str, default=None,
+                        help="API key if vLLM server enforces auth")
     args = parser.parse_args()
-    
-    print(f"Loading model from {args.model_path}...")
-    
-    engine_args = EngineArgs(
-        model=args.model_path,
-        runner="pooling",
-        dtype=args.dtype,
-        trust_remote_code=True,
-        hf_overrides={
-            "architectures": ["Qwen3VLForSequenceClassification"],
-            "classifier_from_token": ["no", "yes"],
-            "is_original_qwen3_reranker": True,
-        },
-    )
-    
-    llm = LLM(**vars(engine_args))
-    
-    template_path = Path(args.template_path)
-    chat_template = template_path.read_text() if template_path.exists() else None
-    
+
     for query_dict in queries:
         query_text = query_dict.get('text', '')
         print(f"\nQuery: {query_text}")
-        
-        scores = []
-        for doc_dict in documents:
-            doc_param = format_document_to_score_param(doc_dict)
-            outputs = llm.score(query_text, doc_param, chat_template=chat_template)
-            score = outputs[0].outputs.score
-            scores.append(score)
-        
+
+        docs_params = [format_document_to_score_param(d) for d in documents]
+        scores = call_vllm_rerank(
+            base_url=args.base_url,
+            model=args.model,
+            query=query_text,
+            docs_params=docs_params,
+            api_key=args.api_key,
+        )
         print(scores)
 
 

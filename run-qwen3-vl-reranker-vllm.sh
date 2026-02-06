@@ -6,3 +6,4 @@ VISIBLE_CUDA_DEVICES=0 HF_HOME=/datapool/huggingface/ HF_ENDPOINT=https://hf-mir
   --host 0.0.0.0 \
   --port 6767
 
+# Uses default sampling params from model for both chat and completions {'temperature': 0.7, 'top_k': 20, 'top_p': 0.8}
