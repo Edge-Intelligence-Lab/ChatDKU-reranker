@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=4 vllm serve Qwen/Qwen3-VL-Reranker-8B \
+CUDA_VISIBLE_DEVICES=6 vllm serve Qwen/Qwen3-VL-Reranker-8B \
   --runner pooling \
   --host 0.0.0.0 \
   --port 6767 \
