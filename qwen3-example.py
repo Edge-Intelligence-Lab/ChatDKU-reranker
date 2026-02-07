@@ -78,9 +78,9 @@ def call_vllm_rerank(
     resp = requests.post(url, headers=headers, json=payload)
     resp.raise_for_status()
     data = resp.json()
+    print(json.dumps(data, indent=2))
 
-    # Cohere/Jina-style response: data["results"] is a list of {index, relevance_score}
-    # Sorting by index
+
     results = sorted(data["results"], key=lambda x: x["index"])
     scores = [r["relevance_score"] for r in results]
     return scores
